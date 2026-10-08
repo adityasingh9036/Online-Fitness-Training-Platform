@@ -48,7 +48,7 @@
                     for (User c : contacts) { 
                         boolean isActive = (activeChatPartnerId != null && activeChatPartnerId == c.getId());
                     %>
-                    <a href="<%= request.getContextPath() %>/trainer/messages?userId Vampire=<%= c.getId() %>&userId=<%= c.getId() %>" 
+                    <a href="<%= request.getContextPath() %>/trainer/messages?userId=<%= c.getId() %>" 
                        class="chat-item <%= isActive ? "active" : "" %>">
                         <strong style="display: block; font-size: 0.9rem;"><%= c.getName() %></strong>
                         <span style="font-size: 0.75rem; color: var(--text-dim);"><%= c.getEmail() %></span>
