@@ -38,7 +38,7 @@ public class WorkoutPlanDAO implements GenericDAO<WorkoutPlan, Integer> {
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     WorkoutPlan plan = mapRowToPlan(rs);
-                    plan.setExercises(exerciseDAO.findByPlanId(plan.getId()));
+                    plan.setExercises(findExercisesForPlanId(id, conn));
                     return plan;
                 }
             }
@@ -60,10 +60,9 @@ public class WorkoutPlanDAO implements GenericDAO<WorkoutPlan, Integer> {
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
-                WorkoutPlan plan = mapRowToPlan(rs);
-                plan.setExercises(exerciseDAO.findByPlanId(plan.getId()));
-                list.add(plan);
+                list.add(mapRowToPlan(rs));
             }
+            loadExercisesForPlans(list, conn);
         } catch (SQLException e) {
             throw new DatabaseException("Error fetching all workout plans", e);
         }
@@ -87,11 +86,10 @@ public class WorkoutPlanDAO implements GenericDAO<WorkoutPlan, Integer> {
             ps.setString(1, status.toUpperCase());
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    WorkoutPlan plan = mapRowToPlan(rs);
-                    plan.setExercises(exerciseDAO.findByPlanId(plan.getId()));
-                    list.add(plan);
+                    list.add(mapRowToPlan(rs));
                 }
             }
+            loadExercisesForPlans(list, conn);
         } catch (SQLException e) {
             throw new DatabaseException("Error fetching plans by status: " + status, e);
         }
@@ -111,15 +109,83 @@ public class WorkoutPlanDAO implements GenericDAO<WorkoutPlan, Integer> {
             ps.setInt(1, trainerId);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    WorkoutPlan plan = mapRowToPlan(rs);
-                    plan.setExercises(exerciseDAO.findByPlanId(plan.getId()));
-                    list.add(plan);
+                    list.add(mapRowToPlan(rs));
                 }
             }
+            loadExercisesForPlans(list, conn);
         } catch (SQLException e) {
             throw new DatabaseException("Error fetching plans for trainer ID: " + trainerId, e);
         }
         return list;
+    }
+
+    private List<Exercise> findExercisesForPlanId(int planId, Connection conn) {
+        List<Exercise> list = new ArrayList<>();
+        String sql = "SELECT e.id, e.name, e.description, e.muscle_group, e.sets, e.reps, e.duration " +
+                     "FROM exercises e " +
+                     "JOIN plan_exercises pe ON e.id = pe.exercise_id " +
+                     "WHERE pe.plan_id = ? ORDER BY e.name ASC";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, planId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(new Exercise(
+                            rs.getInt("id"),
+                            rs.getString("name"),
+                            rs.getString("description"),
+                            rs.getString("muscle_group"),
+                            rs.getInt("sets"),
+                            rs.getInt("reps"),
+                            rs.getInt("duration")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            // Non-critical: allow plan to load even if exercise detail fails
+        }
+        return list;
+    }
+
+    private void loadExercisesForPlans(List<WorkoutPlan> plans, Connection conn) {
+        if (plans == null || plans.isEmpty()) return;
+
+        Map<Integer, WorkoutPlan> planMap = new HashMap<>();
+        StringBuilder idList = new StringBuilder();
+        for (int i = 0; i < plans.size(); i++) {
+            WorkoutPlan p = plans.get(i);
+            p.setExercises(new ArrayList<>());
+            planMap.put(p.getId(), p);
+            if (i > 0) idList.append(",");
+            idList.append(p.getId());
+        }
+
+        String sql = "SELECT pe.plan_id, e.id, e.name, e.description, e.muscle_group, e.sets, e.reps, e.duration " +
+                     "FROM plan_exercises pe " +
+                     "JOIN exercises e ON pe.exercise_id = e.id " +
+                     "WHERE pe.plan_id IN (" + idList.toString() + ") " +
+                     "ORDER BY pe.plan_id, e.name ASC";
+
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                int planId = rs.getInt("plan_id");
+                WorkoutPlan plan = planMap.get(planId);
+                if (plan != null) {
+                    Exercise ex = new Exercise(
+                            rs.getInt("id"),
+                            rs.getString("name"),
+                            rs.getString("description"),
+                            rs.getString("muscle_group"),
+                            rs.getInt("sets"),
+                            rs.getInt("reps"),
+                            rs.getInt("duration")
+                    );
+                    plan.getExercises().add(ex);
+                }
+            }
+        } catch (SQLException e) {
+            // Non-critical fallback
+        }
     }
 
     @Override

@@ -76,6 +76,18 @@ public class DBConnection {
         }
 
         try {
+            String poolMax = props.getProperty("db.pool.maxActive");
+            if (poolMax != null && !poolMax.trim().isEmpty()) {
+                maxPoolSize = Integer.parseInt(poolMax.trim());
+            }
+            String poolTimeout = props.getProperty("db.pool.timeoutMs");
+            if (poolTimeout != null && !poolTimeout.trim().isEmpty()) {
+                poolTimeoutMs = Integer.parseInt(poolTimeout.trim());
+            }
+        } catch (Exception ignored) {
+        }
+
+        try {
             Class.forName(dbDriver);
         } catch (ClassNotFoundException e) {
             throw new DatabaseException("PostgreSQL JDBC Driver not found in classpath: " + dbDriver, e);
@@ -210,10 +222,39 @@ public class DBConnection {
         }
     }
 
+    private static String normalizeJdbcUrl(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return url;
+        }
+        String trimmed = url.trim();
+        if (trimmed.startsWith("postgres://")) {
+            return "jdbc:postgresql://" + trimmed.substring("postgres://".length());
+        }
+        if (trimmed.startsWith("postgresql://") && !trimmed.startsWith("jdbc:postgresql://")) {
+            return "jdbc:" + trimmed;
+        }
+        return trimmed;
+    }
+
     private static String getSetting(String envKey, String propKey, Properties props, String defaultValue) {
-        // Priority 1: Environment Variable
+        // Priority 1: Environment Variable (supports DB_* and DATABASE_* conventions on Render/cloud)
         String val = System.getenv(envKey);
+        if (val == null || val.trim().isEmpty()) {
+            if ("DB_URL".equals(envKey)) {
+                val = System.getenv("DATABASE_URL");
+            } else if ("DB_USER".equals(envKey)) {
+                val = System.getenv("DATABASE_USER");
+                if (val == null || val.trim().isEmpty()) {
+                    val = System.getenv("DB_USERNAME");
+                }
+            } else if ("DB_PASSWORD".equals(envKey)) {
+                val = System.getenv("DATABASE_PASSWORD");
+            }
+        }
         if (val != null && !val.trim().isEmpty()) {
+            if ("DB_URL".equals(envKey)) {
+                return normalizeJdbcUrl(val.trim());
+            }
             return val.trim();
         }
         // Priority 2: System Property (propKey e.g. -Ddb.url or envKey e.g. -DDB_URL)
@@ -246,12 +287,18 @@ public class DBConnection {
     private static synchronized void resolveRuntimeCredentials() {
         if (dbPassword == null || dbPassword.isEmpty() || PLACEHOLDER_PASSWORD.equals(dbPassword)) {
             String runtimePass = System.getenv("DB_PASSWORD");
+            if (runtimePass == null || runtimePass.trim().isEmpty()) {
+                runtimePass = System.getenv("DATABASE_PASSWORD");
+            }
             if (runtimePass != null && !runtimePass.trim().isEmpty()) {
                 dbPassword = runtimePass.trim();
             } else {
                 String sysPass = System.getProperty("db.password");
                 if (sysPass == null || sysPass.trim().isEmpty()) {
                     sysPass = System.getProperty("DB_PASSWORD");
+                }
+                if (sysPass == null || sysPass.trim().isEmpty()) {
+                    sysPass = System.getProperty("DATABASE_PASSWORD");
                 }
                 if (sysPass != null && !sysPass.trim().isEmpty()) {
                     dbPassword = sysPass.trim();
@@ -268,16 +315,40 @@ public class DBConnection {
 
         if (dbUrl == null || dbUrl.isEmpty() || dbUrl.contains(LEGACY_DIRECT_HOST)) {
             String runtimeUrl = System.getenv("DB_URL");
-            dbUrl = (runtimeUrl != null && !runtimeUrl.trim().isEmpty()) ? runtimeUrl.trim() : DEFAULT_DB_URL;
+            if (runtimeUrl == null || runtimeUrl.trim().isEmpty()) {
+                runtimeUrl = System.getenv("DATABASE_URL");
+            }
+            dbUrl = (runtimeUrl != null && !runtimeUrl.trim().isEmpty()) ? normalizeJdbcUrl(runtimeUrl.trim()) : DEFAULT_DB_URL;
+        } else {
+            dbUrl = normalizeJdbcUrl(dbUrl);
         }
+
         if (dbUser == null || dbUser.isEmpty() || "postgres".equals(dbUser)) {
             String runtimeUser = System.getenv("DB_USER");
+            if (runtimeUser == null || runtimeUser.trim().isEmpty()) {
+                runtimeUser = System.getenv("DATABASE_USER");
+            }
+            if (runtimeUser == null || runtimeUser.trim().isEmpty()) {
+                runtimeUser = System.getenv("DB_USERNAME");
+            }
             dbUser = (runtimeUser != null && !runtimeUser.trim().isEmpty()) ? runtimeUser.trim() : DEFAULT_DB_USER;
         }
     }
 
+    // ==========================================================
+    // Pure JDBC Connection Pool Implementation (Thread-Safe)
+    // ==========================================================
+    private static int maxPoolSize = 10;
+    private static int poolTimeoutMs = 5000;
+    private static final java.util.concurrent.BlockingQueue<Connection> idlePool = 
+            new java.util.concurrent.LinkedBlockingQueue<>();
+    private static final java.util.concurrent.atomic.AtomicInteger activeConnectionCount = 
+            new java.util.concurrent.atomic.AtomicInteger(0);
+    private static volatile boolean poolPrewarmed = false;
+
     /**
-     * Obtains a fresh active JDBC Connection to the Supabase PostgreSQL database.
+     * Obtains an active JDBC Connection from the managed Pure JDBC connection pool.
+     * Reuses existing physical connections to eliminate SSL/TLS handshake delays.
      *
      * @return java.sql.Connection
      * @throws DatabaseException if connection fails or password is missing
@@ -285,33 +356,187 @@ public class DBConnection {
     public static Connection getConnection() {
         resolveRuntimeCredentials();
 
-        if (dbPassword == null || dbPassword.isEmpty()) {
+        if (dbPassword == null || dbPassword.isEmpty() || PLACEHOLDER_PASSWORD.equals(dbPassword)) {
             throw new DatabaseException("Supabase database password is not configured. "
                     + "Please set the DB_PASSWORD environment variable (or Tomcat bin/setenv.bat / db.properties).");
         }
 
-        try {
-            return DriverManager.getConnection(dbUrl, dbUser, dbPassword);
-        } catch (SQLException e) {
-            // If connection fails, check if credentials on disk or environment were updated
-            String previousPass = dbPassword;
-            String previousUrl = dbUrl;
-            String previousUser = dbUser;
-            loadConfiguration();
-            boolean changed = !java.util.Objects.equals(previousPass, dbPassword)
-                    || !java.util.Objects.equals(previousUrl, dbUrl)
-                    || !java.util.Objects.equals(previousUser, dbUser);
-            if (changed && dbPassword != null && !dbPassword.isEmpty()) {
-                try {
-                    return DriverManager.getConnection(dbUrl, dbUser, dbPassword);
-                } catch (SQLException retryEx) {
-                    throw new DatabaseException("Failed to establish database connection to: " + dbUrl + 
-                            " (User: " + dbUser + "). Verify Supabase credentials and network access: " + retryEx.getMessage(), retryEx);
+        triggerPoolWarmup();
+        Connection physicalConn = acquirePooledConnection();
+        return wrapConnection(physicalConn);
+    }
+
+    private static Connection acquirePooledConnection() {
+        long deadline = System.currentTimeMillis() + poolTimeoutMs;
+
+        while (System.currentTimeMillis() <= deadline) {
+            // 1. Try to take an idle connection from the pool
+            Connection physical = idlePool.poll();
+            if (physical != null) {
+                if (isConnectionAlive(physical)) {
+                    return physical;
+                } else {
+                    closePhysicalQuietly(physical);
+                    activeConnectionCount.decrementAndGet();
+                    continue;
                 }
             }
-            throw new DatabaseException("Failed to establish database connection to: " + dbUrl + 
-                    " (User: " + dbUser + "). Verify Supabase credentials and network access: " + e.getMessage(), e);
+
+            // 2. Pool empty: check if we can create a new physical connection up to maxPoolSize
+            int current = activeConnectionCount.get();
+            if (current < maxPoolSize) {
+                if (activeConnectionCount.compareAndSet(current, current + 1)) {
+                    try {
+                        return createPhysicalConnection();
+                    } catch (SQLException e) {
+                        activeConnectionCount.decrementAndGet();
+                        throw new DatabaseException("Failed to establish database connection to: " + dbUrl + 
+                                " (User: " + dbUser + "). Verify Supabase credentials and network access: " + e.getMessage(), e);
+                    }
+                }
+                continue; // CAS lost race, retry loop
+            }
+
+            // 3. Pool is at capacity: wait for an available connection up to remaining time
+            long waitMs = Math.max(10, deadline - System.currentTimeMillis());
+            try {
+                physical = idlePool.poll(waitMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+                if (physical != null) {
+                    if (isConnectionAlive(physical)) {
+                        return physical;
+                    } else {
+                        closePhysicalQuietly(physical);
+                        activeConnectionCount.decrementAndGet();
+                    }
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new DatabaseException("Interrupted while waiting for database connection from pool", e);
+            }
         }
+
+        throw new DatabaseException("Database connection pool exhausted (maxActive=" + maxPoolSize 
+                + "). Timed out waiting for available connection after " + poolTimeoutMs + "ms.");
+    }
+
+    private static Connection createPhysicalConnection() throws SQLException {
+        return DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+    }
+
+    private static boolean isConnectionAlive(Connection conn) {
+        if (conn == null) return false;
+        try {
+            if (conn.isClosed()) return false;
+            return conn.isValid(1);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static Connection wrapConnection(final Connection physicalConn) {
+        return (Connection) java.lang.reflect.Proxy.newProxyInstance(
+                DBConnection.class.getClassLoader(),
+                new Class<?>[]{ Connection.class },
+                new java.lang.reflect.InvocationHandler() {
+                    private boolean closed = false;
+
+                    @Override
+                    public Object invoke(Object proxy, java.lang.reflect.Method method, Object[] args) throws Throwable {
+                        String name = method.getName();
+
+                        if ("close".equals(name)) {
+                            if (!closed) {
+                                closed = true;
+                                returnToPool(physicalConn);
+                            }
+                            return null;
+                        }
+
+                        if ("isClosed".equals(name)) {
+                            return closed || physicalConn.isClosed();
+                        }
+
+                        if (closed) {
+                            throw new SQLException("Connection has already been closed and returned to pool.");
+                        }
+
+                        if ("unwrap".equals(name) && args != null && args.length == 1 && ((Class<?>) args[0]).isInstance(physicalConn)) {
+                            return physicalConn;
+                        }
+
+                        try {
+                            return method.invoke(physicalConn, args);
+                        } catch (java.lang.reflect.InvocationTargetException ite) {
+                            throw ite.getCause();
+                        }
+                    }
+                }
+        );
+    }
+
+    private static void returnToPool(Connection physicalConn) {
+        if (physicalConn == null) return;
+        try {
+            if (physicalConn.isClosed()) {
+                activeConnectionCount.decrementAndGet();
+                return;
+            }
+            if (!physicalConn.getAutoCommit()) {
+                physicalConn.rollback();
+                physicalConn.setAutoCommit(true);
+            }
+            physicalConn.clearWarnings();
+
+            boolean accepted = idlePool.offer(physicalConn);
+            if (!accepted) {
+                closePhysicalQuietly(physicalConn);
+                activeConnectionCount.decrementAndGet();
+            }
+        } catch (Exception e) {
+            closePhysicalQuietly(physicalConn);
+            activeConnectionCount.decrementAndGet();
+        }
+    }
+
+    private static void closePhysicalQuietly(Connection c) {
+        if (c != null) {
+            try {
+                c.close();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    public static synchronized void triggerPoolWarmup() {
+        if (poolPrewarmed || dbPassword == null || dbPassword.isEmpty() || PLACEHOLDER_PASSWORD.equals(dbPassword)) {
+            return;
+        }
+        poolPrewarmed = true;
+        Thread warmupThread = new Thread(() -> {
+            int warmTarget = Math.min(3, maxPoolSize);
+            for (int i = 0; i < warmTarget; i++) {
+                if (activeConnectionCount.get() >= maxPoolSize) break;
+                try {
+                    activeConnectionCount.incrementAndGet();
+                    Connection c = createPhysicalConnection();
+                    idlePool.offer(c);
+                } catch (Exception e) {
+                    activeConnectionCount.decrementAndGet();
+                    break;
+                }
+            }
+        }, "FitTrack-DBPool-Warmup");
+        warmupThread.setDaemon(true);
+        warmupThread.start();
+    }
+
+    public static synchronized void resetPool() {
+        Connection c;
+        while ((c = idlePool.poll()) != null) {
+            closePhysicalQuietly(c);
+            activeConnectionCount.decrementAndGet();
+        }
+        poolPrewarmed = false;
     }
 
     /**

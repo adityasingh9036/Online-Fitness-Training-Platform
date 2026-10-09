@@ -1,0 +1,49 @@
+# ==========================================================
+# FitTrack Docker Build Context Exclusions (.dockerignore)
+# ==========================================================
+# Prevent copying credentials, environment files, local secrets,
+# compiled artifacts, and IDE configurations into the Docker image.
+
+# Local secrets & environment configuration (CRITICAL)
+.env
+.env.*
+*.env
+setenv.bat
+setenv.sh
+*.local.ps1
+run-tomcat.ps1
+db_credentials_secret.properties
+*.properties.local
+
+# Git version control
+.git/
+.gitignore
+
+# Maven local build outputs & caches
+target/
+*.class
+
+# IDE & workspace files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+.springBeans
+.sts4-classes
+nbproject/
+nbbuild/
+nbdist/
+.nb-gradletask/
+
+# Documentation and temporary presentation materials
+presentation_slides.md
+*.log
+
+# Operating system files
+.DS_Store
+Thumbs.db

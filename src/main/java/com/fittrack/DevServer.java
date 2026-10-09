@@ -32,11 +32,20 @@ public class DevServer {
         }
     }
 
+    public static class HealthCheckServlet extends HttpServlet {
+        @Override
+        protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+            resp.setStatus(HttpServletResponse.SC_OK);
+            resp.setContentType("text/plain");
+            resp.getWriter().write("OK");
+        }
+    }
+
     public static void main(String[] args) {
         try {
             int port = 8080;
             String portProp = System.getProperty("server.port");
-            if (portProp == null) {
+            if (portProp == null || portProp.trim().isEmpty()) {
                 portProp = System.getenv("PORT");
             }
             if (portProp != null && !portProp.trim().isEmpty()) {
@@ -51,9 +60,22 @@ public class DevServer {
             Tomcat tomcat = new Tomcat();
             tomcat.setBaseDir(baseDir.getAbsolutePath());
             tomcat.setPort(port);
-            tomcat.getConnector(); // Initialize default HTTP connector
+            
+            // Explicitly bind to 0.0.0.0 (all network interfaces) for Docker and cloud hosting (Render)
+            org.apache.catalina.connector.Connector connector = tomcat.getConnector();
+            connector.setProperty("address", "0.0.0.0");
+
+            // Web performance: enable HTTP Keep-Alive and GZIP Compression
+            connector.setProperty("compression", "on");
+            connector.setProperty("compressionMinSize", "1024");
+            connector.setProperty("compressableMimeType", "text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json");
+            connector.setProperty("connectionTimeout", "20000");
+            connector.setProperty("maxKeepAliveRequests", "100");
 
             File webappDir = new File("src/main/webapp");
+            if (!webappDir.exists()) {
+                webappDir = new File("webapp");
+            }
             if (!webappDir.exists()) {
                 throw new IllegalStateException("Webapp directory not found at " + webappDir.getAbsolutePath());
             }
@@ -67,6 +89,9 @@ public class DevServer {
             // Mount compiled classes and src/main/resources to /WEB-INF/classes
             File additionWebInfClasses = new File("target/classes");
             if (!additionWebInfClasses.exists()) {
+                additionWebInfClasses = new File("classes");
+            }
+            if (!additionWebInfClasses.exists()) {
                 additionWebInfClasses.mkdirs();
             }
             WebResourceRoot resources = new StandardRoot(ctx);
@@ -74,17 +99,24 @@ public class DevServer {
                     additionWebInfClasses.getAbsolutePath(), "/"));
 
             File resourcesDir = new File("src/main/resources");
+            if (!resourcesDir.exists()) {
+                resourcesDir = new File("resources");
+            }
             if (resourcesDir.exists()) {
                 resources.addPreResources(new DirResourceSet(resources, "/WEB-INF/classes",
                         resourcesDir.getAbsolutePath(), "/"));
             }
             ctx.setResources(resources);
 
-            // Add root context redirect: http://localhost:8080/ -> http://localhost:8080/fittrack/
+            // Add root context: redirect root to /fittrack/ and provide /health for cloud health checks
             Context rootCtx = tomcat.addContext("", baseDir.getAbsolutePath());
             rootCtx.setParentClassLoader(DevServer.class.getClassLoader());
             Tomcat.addServlet(rootCtx, "RootRedirectServlet", new RootRedirectServlet());
             rootCtx.addServletMappingDecoded("/", "RootRedirectServlet");
+
+            Tomcat.addServlet(rootCtx, "HealthCheckServlet", new HealthCheckServlet());
+            rootCtx.addServletMappingDecoded("/health", "HealthCheckServlet");
+            rootCtx.addServletMappingDecoded("/healthz", "HealthCheckServlet");
 
             System.out.println("==================================================================");
             System.out.println("   FitTrack Development Server Starting...                        ");
