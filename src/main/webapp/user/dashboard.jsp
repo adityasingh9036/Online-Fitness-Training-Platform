@@ -44,23 +44,37 @@
 
     <div class="main-container">
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <% if (request.getParameter("success") != null) { %>
+            <div class="alert alert-success">
+                <span><%= request.getParameter("success") %></span>
+            </div>
+        <% } %>
+        <% if (request.getParameter("error") != null) { %>
+            <div class="alert alert-error">
+                <span><%= request.getParameter("error") %></span>
+            </div>
+        <% } %>
+
+        <div class="page-header">
             <div>
-                <h1 style="font-size: 1.75rem; font-weight: 700;">Welcome, <%= currentUser != null ? currentUser.getName() : "Member" %>!</h1>
-                <p style="color: var(--text-muted); font-size: 0.95rem;">
-                    Role: <span class="badge badge-success">MEMBER</span> | Track your daily fitness and reach your potential.
+                <h1 class="page-title">Welcome, <%= currentUser != null ? currentUser.getName() : "Member" %>!</h1>
+                <p class="page-subtitle">
+                    Role: <span class="badge badge-success">MEMBER</span> | Track your daily fitness metrics and achieve your milestones.
                 </p>
             </div>
-            <div style="display: flex; gap: 0.5rem;">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                 <a href="<%= request.getContextPath() %>/user/progress" class="btn btn-primary btn-sm">+ Log New Weight</a>
                 <a href="<%= request.getContextPath() %>/user/workouts" class="btn btn-secondary btn-sm">Browse Workouts</a>
             </div>
         </div>
 
-        <!-- 4 Metric Cards as per PRD Section 14 -->
+        <!-- 4 Metric Cards with Consistent SaaS Icons -->
         <div class="stats-grid">
-            <div class="stat-card">
-                <span class="stat-label">Current Weight</span>
+            <div class="stat-card stat-emerald">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <span class="stat-label">Current Weight</span>
+                    <div class="stat-icon stat-icon-emerald">⚖️</div>
+                </div>
                 <span class="stat-value" style="color: #34d399;">
                     <%= latestProgress != null ? latestProgress.getWeight() + " kg" : "Not Logged" %>
                 </span>
@@ -69,8 +83,11 @@
                 </span>
             </div>
 
-            <div class="stat-card">
-                <span class="stat-label">Net Weight Change</span>
+            <div class="stat-card stat-blue">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <span class="stat-label">Net Weight Change</span>
+                    <div class="stat-icon stat-icon-blue">📈</div>
+                </div>
                 <span class="stat-value" style="color: #60a5fa;">
                     <% if (progressSummary != null && (Boolean) progressSummary.get("hasData")) { 
                         double net = (Double) progressSummary.get("netChange"); %>
@@ -82,20 +99,26 @@
                 <span class="stat-desc">Overall transformation delta</span>
             </div>
 
-            <div class="stat-card">
-                <span class="stat-label">Body Mass Index (BMI)</span>
+            <div class="stat-card stat-indigo">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <span class="stat-label">Body Mass Index (BMI)</span>
+                    <div class="stat-icon stat-icon-indigo">🩺</div>
+                </div>
                 <span class="stat-value">
                     <%= (progressSummary != null && (Boolean) progressSummary.get("hasData")) ? progressSummary.get("currentBmi") : "N/A" %>
                 </span>
                 <span class="stat-desc">
-                    Category: <span class="badge badge-primary"><%= (progressSummary != null && (Boolean) progressSummary.get("hasData")) ? progressSummary.get("bmiCategory") : "N/A" %></span>
+                    Category: <span class="badge badge-primary"><%= (progressSummary != null && (Boolean) progressSummary.get("hasData")) ? progressSummary.get("bmiCategory") : "Pending Data" %></span>
                 </span>
             </div>
 
-            <div class="stat-card">
-                <span class="stat-label">Available Plans</span>
+            <div class="stat-card stat-amber">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <span class="stat-label">Available Programs</span>
+                    <div class="stat-icon stat-icon-amber">🎯</div>
+                </div>
                 <span class="stat-value" style="color: #fbbf24;"><%= availablePlans != null ? availablePlans.size() : 0 %></span>
-                <span class="stat-desc">Approved programs to explore</span>
+                <span class="stat-desc">Approved workouts to explore</span>
             </div>
         </div>
 
@@ -103,69 +126,103 @@
         <div class="card" style="border: 1px solid rgba(16, 185, 129, 0.4); background: linear-gradient(180deg, rgba(16, 185, 129, 0.08) 0%, rgba(30, 41, 59, 1) 100%);">
             <div class="card-header">
                 <div>
-                    <span class="badge badge-success" style="margin-bottom: 0.35rem;">Currently Active Program</span>
+                    <span class="badge badge-success" style="margin-bottom: 0.35rem;">Active Training Program</span>
                     <h2 class="card-title" style="font-size: 1.35rem;">
                         <%= activePlan != null ? activePlan.getPlanTitle() : "No Active Program Selected" %>
                     </h2>
                 </div>
-                <% if (activePlan != null) { %>
-                    <form action="<%= request.getContextPath() %>/user/workouts/complete" method="POST">
-                        <input type="hidden" name="planId" value="<%= activePlan.getPlanId() %>">
-                        <button type="submit" class="btn btn-success btn-sm">Mark Complete</button>
-                    </form>
-                <% } else { %>
-                    <a href="<%= request.getContextPath() %>/user/workouts" class="btn btn-primary btn-sm">Choose a Plan</a>
-                <% } %>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <% if (activePlan != null) { %>
+                        <a href="<%= request.getContextPath() %>/user/workouts/details?id=<%= activePlan.getPlanId() %>" class="btn btn-primary btn-sm">
+                            🏋️ Daily Exercises
+                        </a>
+                        <form action="<%= request.getContextPath() %>/user/workouts/complete" method="POST" style="margin: 0; display: inline;">
+                            <input type="hidden" name="planId" value="<%= activePlan.getPlanId() %>">
+                            <button type="submit" class="btn btn-secondary btn-sm" onclick="return confirm('Complete this workout program?');">Mark Complete</button>
+                        </form>
+                    <% } else { %>
+                        <a href="<%= request.getContextPath() %>/user/workouts" class="btn btn-primary btn-sm">Explore Programs</a>
+                    <% } %>
+                </div>
             </div>
 
-            <% if (activePlan != null) { %>
-                <div style="display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 0.5rem;">
+            <% if (activePlan != null) { 
+                @SuppressWarnings("unchecked")
+                Map<String, Object> actProg = (Map<String, Object>) request.getAttribute("activePlanProgress");
+                int actPct = (actProg != null && actProg.containsKey("percentage")) ? (int) actProg.get("percentage") : 0;
+                int actComp = (actProg != null && actProg.containsKey("completedWeekly")) ? (int) actProg.get("completedWeekly") : 0;
+                int actTot = (actProg != null && actProg.containsKey("totalExercises")) ? (int) actProg.get("totalExercises") : 0;
+            %>
+                <div style="display: flex; gap: 2.5rem; flex-wrap: wrap; margin-top: 0.5rem; padding-top: 0.5rem;">
                     <div>
-                        <span style="font-size: 0.8rem; color: var(--text-dim); display: block;">Coach:</span>
-                        <strong><%= activePlan.getTrainerName() %></strong>
+                        <span style="font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; display: block;">Coach</span>
+                        <strong style="color: #f1f5f9;"><%= activePlan.getTrainerName() %></strong>
                     </div>
                     <div>
-                        <span style="font-size: 0.8rem; color: var(--text-dim); display: block;">Difficulty:</span>
+                        <span style="font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; display: block;">Intensity</span>
                         <span class="badge badge-warning"><%= activePlan.getDifficulty() %></span>
                     </div>
                     <div>
-                        <span style="font-size: 0.8rem; color: var(--text-dim); display: block;">Program Length:</span>
-                        <strong><%= activePlan.getDuration() %> Weeks</strong>
+                        <span style="font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; display: block;">Duration</span>
+                        <strong style="color: #f1f5f9;"><%= activePlan.getDuration() %> Weeks</strong>
                     </div>
                     <div>
-                        <span style="font-size: 0.8rem; color: var(--text-dim); display: block;">Started Date:</span>
-                        <strong><%= activePlan.getEnrolledAt() != null ? activePlan.getEnrolledAt().toString().substring(0, 10) : "-" %></strong>
+                        <span style="font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; display: block;">Enrolled Date</span>
+                        <strong style="color: #f1f5f9;"><%= activePlan.getEnrolledAt() != null ? activePlan.getEnrolledAt().toString().substring(0, 10) : "-" %></strong>
+                    </div>
+                </div>
+
+                <!-- Weekly Completion Bar -->
+                <div style="margin-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.85rem;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 0.4rem;">
+                        <span style="color: var(--text-muted);">Weekly Routine Progress</span>
+                        <strong style="color: var(--emerald-400);"><%= actPct %>% (<%= actComp %> of <%= actTot %> exercises done this week)</strong>
+                    </div>
+                    <div style="width: 100%; height: 7px; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden;">
+                        <div style="width: <%= actPct %>%; height: 100%; background: linear-gradient(90deg, #10b981, #059669); border-radius: 999px;"></div>
                     </div>
                 </div>
             <% } else { %>
-                <p style="color: var(--text-muted); padding: 0.5rem 0;">
-                    You are not following any training schedule right now. Browse our library of certified programs to start building strength!
-                </p>
+                <div class="empty-state" style="padding: 1.5rem 1rem;">
+                    <div class="empty-state-icon">🏃</div>
+                    <div class="empty-state-title">No Active Workout Enrolled</div>
+                    <p class="empty-state-desc">You are not following an active fitness routine right now. Choose a structured workout plan designed by our coaches to stay consistent.</p>
+                    <a href="<%= request.getContextPath() %>/user/workouts" class="btn btn-primary btn-sm" style="margin-top: 0.75rem;">Browse Programs Catalog</a>
+                </div>
             <% } %>
         </div>
 
         <!-- Available Workout Plans Section -->
         <div class="card">
             <div class="card-header">
-                <h2 class="card-title">Featured Training Programs</h2>
+                <div>
+                    <h2 class="card-title">Featured Training Programs</h2>
+                    <p class="card-subtitle">Recommended training routines by certified fitness trainers</p>
+                </div>
                 <a href="<%= request.getContextPath() %>/user/workouts" class="btn btn-secondary btn-sm">View All Plans</a>
             </div>
 
             <% if (availablePlans == null || availablePlans.isEmpty()) { %>
-                <p style="color: var(--text-muted);">No approved workout plans currently available.</p>
+                <div class="empty-state">
+                    <div class="empty-state-icon">📋</div>
+                    <div class="empty-state-title">No Workout Plans Available</div>
+                    <p class="empty-state-desc">There are no approved workout plans in the library yet. Please check back shortly.</p>
+                </div>
             <% } else { %>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem;">
                     <% for (WorkoutPlan wp : availablePlans) { %>
-                        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, border-color 0.2s ease;">
                             <div>
                                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                                    <h3 style="font-size: 1.1rem; color: #fff;"><%= wp.getTitle() %></h3>
+                                    <h3 style="font-size: 1.1rem; color: #fff; font-weight: 600;"><%= wp.getTitle() %></h3>
                                     <span class="badge <%= wp.getDifficultyBadgeClass() %>"><%= wp.getDifficulty() %></span>
                                 </div>
-                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;"><%= wp.getDescription() %></p>
+                                <p style="font-size: 0.86rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1.25rem;"><%= wp.getDescription() %></p>
                             </div>
-                            <div style="border-top: 1px solid var(--card-border); padding-top: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-size: 0.8rem; color: var(--text-dim);">By Coach <%= wp.getTrainerName() %></span>
+                            <div style="border-top: 1px solid var(--card-border); padding-top: 0.85rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                                <span style="font-size: 0.82rem; color: var(--text-dim); display: flex; align-items: center; gap: 0.35rem;">
+                                    <span>🏋️</span> Coach <%= wp.getTrainerName() %>
+                                </span>
                                 <div style="display: flex; gap: 0.5rem;">
                                     <a href="<%= request.getContextPath() %>/user/workouts/details?id=<%= wp.getId() %>" class="btn btn-secondary btn-sm">Details</a>
                                     <form action="<%= request.getContextPath() %>/user/workouts/enroll" method="POST" style="display:inline;">
@@ -183,7 +240,7 @@
     </div>
 
     <footer class="footer">
-        <p>FitTrack Fitness Member Portal &copy; 2026.</p>
+        <p>FitTrack Fitness Member Portal &copy; 2026. Java Web &amp; PostgreSQL SaaS Platform.</p>
     </footer>
 
 </body>

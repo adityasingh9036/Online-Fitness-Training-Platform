@@ -38,6 +38,10 @@ public class UserDashboardServlet extends HttpServlet {
         User user = (User) session.getAttribute("currentUser");
 
         UserWorkoutPlan activePlan = workoutService.getUserActivePlan(user.getId());
+        if (activePlan != null) {
+            Map<String, Object> activePlanProgress = workoutService.getWeeklyProgress(user.getId(), activePlan.getPlanId());
+            request.setAttribute("activePlanProgress", activePlanProgress);
+        }
         List<WorkoutPlan> availablePlans = workoutService.getApprovedPlans();
         Map<String, Object> progressSummary = progressService.calculateProgressSummary(user.getId());
         Progress latestProgress = progressService.getLatestProgress(user.getId());

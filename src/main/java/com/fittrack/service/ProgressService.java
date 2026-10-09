@@ -58,6 +58,10 @@ public class ProgressService {
         return progressDAO.delete(id);
     }
 
+    public boolean deleteProgress(int id, int userId) {
+        return progressDAO.deleteByIdAndUserId(id, userId);
+    }
+
     /**
      * Calculates overall progress summary for dashboard metrics.
      */

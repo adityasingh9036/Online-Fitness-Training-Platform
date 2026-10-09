@@ -71,14 +71,17 @@ FitTrack bridges the gap between fitness seekers and certified fitness coaches. 
 
 ### Supabase Project Details
 * **Project Name:** `Online Fitness Training Platform`
-* **Project ID:** `kclihlnwczjifrmakfsp`
-* **Direct JDBC Host:** `db.kclihlnwczjifrmakfsp.supabase.co:5432`
+* **Project ID:** `<YOUR_SUPABASE_PROJECT_ID>`
+* **IPv4 Session Pooler Host (Recommended):** `<YOUR_SUPABASE_HOST>:5432` *(e.g., `aws-0-ap-south-1.pooler.supabase.com:5432`)*
+* **Pooler Database User:** `postgres.<YOUR_SUPABASE_PROJECT_ID>`
+* **Database Name:** `postgres`
+* **Direct Host (IPv6 only):** `db.<YOUR_SUPABASE_PROJECT_ID>.supabase.co:5432` *(May fail on IPv4 networks; the application automatically routes to the Session Pooler)*
 
 ### Step 1: Execute Schema in Supabase
-1. Open your [Supabase Dashboard](https://supabase.com/dashboard/project/kclihlnwczjifrmakfsp).
+1. Open your [Supabase Dashboard](https://supabase.com/dashboard).
 2. Navigate to **SQL Editor** in the left sidebar.
 3. Open [`schema.sql`](file:///d:/Online%20Fitness%20Training%20Platform/schema.sql) from the project root, paste it into the SQL editor, and click **Run**.
-4. All 9 relational tables and indexes (`users`, `workout_plans`, `exercises`, `plan_exercises`, `progress`, `messages`, `notifications`, `system_settings`, `user_workout_plans`) will be created.
+4. All 10 relational tables and indexes (`users`, `workout_plans`, `exercises`, `plan_exercises`, `progress`, `messages`, `notifications`, `system_settings`, `user_workout_plans`, `user_exercise_completions`) will be created.
 
 ### Step 2: Seed Initial Data
 1. Open [`seed.sql`](file:///d:/Online%20Fitness%20Training%20Platform/seed.sql) in the project root.
@@ -86,15 +89,18 @@ FitTrack bridges the gap between fitness seekers and certified fitness coaches. 
 3. Default admin, coach, trainee, workout plans, and exercise routines will be populated.
 
 ### Step 3: Configure Database Credentials
-Edit [`src/main/resources/db.properties`](file:///d:/Online%20Fitness%20Training%20Platform/src/main/resources/db.properties):
+Edit [`src/main/resources/db.properties`](file:///d:/Online%20Fitness%20Training%20Platform/src/main/resources/db.properties) or copy from [`db.properties.example`](file:///d:/Online%20Fitness%20Training%20Platform/db.properties.example):
 ```properties
 db.driver=org.postgresql.Driver
-db.url=jdbc:postgresql://db.kclihlnwczjifrmakfsp.supabase.co:5432/postgres?sslmode=require
-db.username=postgres
+db.url=jdbc:postgresql://<YOUR_SUPABASE_HOST>:5432/postgres?sslmode=require
+db.username=postgres.<YOUR_SUPABASE_PROJECT_ID>
 db.password=YOUR_SUPABASE_DB_PASSWORD
 ```
-> **Tip:** You can also pass credentials via environment variables without modifying the file:
-> `set DB_PASSWORD=your_database_password`
+> **Security Best Practice:** Keep passwords out of version control. FitTrack dynamically loads credentials with priority:
+> 1. Environment Variables: `DB_URL`, `DB_USER`, `DB_PASSWORD`
+> 2. JVM System Properties: `-Ddb.url=...`, `-Ddb.username=...`, `-Ddb.password=...`
+> 3. Local `.env` file (strictly excluded by `.gitignore`)
+> 4. `db.properties` classpath resource / local filesystem
 
 ---
 
@@ -110,14 +116,33 @@ db.password=YOUR_SUPABASE_DB_PASSWORD
 
 ---
 
-## 7. How to Build & Run
+## 7. How to Run the Application
+
+### 🚀 Quick Start: Embedded Development Server (`npm run dev`)
+FitTrack includes an embedded Tomcat 10 development server that runs instantly without needing a separate Tomcat installation:
+
+```powershell
+# Using npm:
+npm run dev
+
+# Or directly with Maven Wrapper:
+.\mvnw.cmd compile exec:java
+```
+
+Once started, open your browser at:
+* **Web Application:** `http://localhost:8080/fittrack/`
+* **Root Redirect:** `http://localhost:8080/`
+
+---
+
+### 📦 Standalone Deployment with Apache Tomcat 10.1+
 
 ### Prerequisites
 * JDK 17 or higher (`java -version`)
-* Apache Tomcat 10.x / 10.1+ (supports Jakarta EE 9/10)
+* Apache Tomcat 10.1.x (supports Jakarta EE 9/10 `jakarta.servlet`)
 
-### Option A: Build WAR with Maven
-In the project root directory, run:
+### Step 1: Build Deployable WAR
+In PowerShell at the project root:
 ```powershell
 .\mvnw.cmd clean package
 ```
@@ -125,14 +150,59 @@ This produces the deployable artifact:
 ```
 target/fittrack.war
 ```
-Copy `target/fittrack.war` into your Tomcat `webapps/` directory and start Tomcat. Open:
-`http://localhost:8080/fittrack`
 
-### Option B: Run via IntelliJ IDEA
-1. Open IntelliJ IDEA &rarr; **File** &rarr; **Open** &rarr; select `d:\Online Fitness Training Platform`.
-2. Add Tomcat Local Configuration (**Run** &rarr; **Edit Configurations** &rarr; **+** &rarr; **Tomcat Server** &rarr; **Local**).
-3. In the **Deployment** tab, add `fittrack-platform:war exploded` with application context `/fittrack`.
-4. Click **Run** or **Debug**.
+### Step 2: Deploy to Apache Tomcat
+Copy `target/fittrack.war` into your Tomcat `webapps/` folder:
+```powershell
+Copy-Item "target\fittrack.war" -Destination "<TOMCAT_HOME>\webapps\"
+```
+
+### Step 3: Configure Tomcat Runtime Database Environment Variables
+
+To ensure Tomcat processes receive the database credentials safely without hardcoding passwords into Git:
+
+#### Option A: Using Tomcat `bin\setenv.bat` (Recommended & Persistent for Tomcat)
+Tomcat's `startup.bat` automatically calls `bin\setenv.bat` if it exists.
+1. Copy the provided template from the project root into your Tomcat `bin` folder:
+   ```powershell
+   Copy-Item ".\setenv.bat.template" -Destination "<TOMCAT_HOME>\bin\setenv.bat"
+   ```
+2. Open `<TOMCAT_HOME>\bin\setenv.bat` in any text editor and fill in your actual password:
+   ```cmd
+   @echo off
+   set "DB_URL=jdbc:postgresql://<YOUR_SUPABASE_HOST>:5432/postgres?sslmode=require"
+   set "DB_USER=postgres.<YOUR_SUPABASE_PROJECT_ID>"
+   set "DB_PASSWORD=YOUR_ACTUAL_SUPABASE_PASSWORD"
+   ```
+3. Start Tomcat:
+   ```powershell
+   cd "<TOMCAT_HOME>\bin"
+   .\startup.bat
+   ```
+
+#### Option B: Set Environment Variables in PowerShell Before Starting Tomcat
+Set the environment variables in the active PowerShell window and start Tomcat directly from that same session:
+```powershell
+$env:DB_URL = "jdbc:postgresql://<YOUR_SUPABASE_HOST>:5432/postgres?sslmode=require"
+$env:DB_USER = "postgres.<YOUR_SUPABASE_PROJECT_ID>"
+$env:DB_PASSWORD = "YOUR_ACTUAL_SUPABASE_PASSWORD"
+
+cd "<TOMCAT_HOME>\bin"
+.\startup.bat
+```
+*(Note: Variables set with `$env:` are scoped to that terminal window. The child Tomcat process launched from that terminal inherits them.)*
+
+#### Option C: Set Persistent Windows User Environment Variables
+If you prefer setting variables permanently for your Windows user account (so all future PowerShell sessions and double-clicked `.bat` files have them):
+```powershell
+[System.Environment]::SetEnvironmentVariable("DB_URL", "jdbc:postgresql://<YOUR_SUPABASE_HOST>:5432/postgres?sslmode=require", "User")
+[System.Environment]::SetEnvironmentVariable("DB_USER", "postgres.<YOUR_SUPABASE_PROJECT_ID>", "User")
+[System.Environment]::SetEnvironmentVariable("DB_PASSWORD", "YOUR_ACTUAL_SUPABASE_PASSWORD", "User")
+```
+
+### Step 4: Access the Application
+Open your web browser and navigate to:
+**http://localhost:8080/fittrack/**
 
 ---
 
@@ -142,8 +212,10 @@ Copy `target/fittrack.war` into your Tomcat `webapps/` directory and start Tomca
 d:/Online Fitness Training Platform/
 ├── pom.xml                               # Maven Project Descriptor
 ├── mvnw.cmd                              # Maven Wrapper Script
-├── schema.sql                            # PostgreSQL DDL for Supabase
+├── schema.sql                            # PostgreSQL DDL for Supabase (10 tables)
 ├── seed.sql                              # Seed data with default users & plans
+├── db.properties.example                 # Safe credential configuration template
+├── setenv.bat.template                   # Tomcat environment variables template
 ├── README.md                             # Comprehensive Documentation
 ├── presentation_slides.md                # 12 Academic Slides for Viva Review
 └── src/
@@ -203,7 +275,8 @@ d:/Online Fitness Training Platform/
     │   │       ├── PasswordUtil.java
     │   │       └── ValidationUtil.java
     │   ├── resources/
-    │   │   └── db.properties             # Database Config
+    │   │   ├── db.properties             # Database Config
+    │   │   └── db.properties.example     # Database Config Template
     │   └── webapp/                       # JSP Pages & Assets
     │       ├── WEB-INF/web.xml
     │       ├── css/style.css

@@ -42,17 +42,18 @@ public class PasswordUtil {
     }
 
     /**
-     * Verifies if raw password matches stored hash (or fallback plaintext match for demo safety).
+     * Verifies if raw password matches the stored SHA-256 hash.
+     * Enforces strict cryptographic hash matching without insecure plaintext fallbacks.
      *
      * @param rawPassword Plain text candidate password
-     * @param storedHash  Stored hash from database
-     * @return true if valid
+     * @param storedHash  Stored SHA-256 hash from database
+     * @return true if valid hash match
      */
     public static boolean verifyPassword(String rawPassword, String storedHash) {
-        if (rawPassword == null || storedHash == null) {
+        if (rawPassword == null || storedHash == null || rawPassword.trim().isEmpty()) {
             return false;
         }
         String calculatedHash = hashPassword(rawPassword);
-        return calculatedHash.equalsIgnoreCase(storedHash) || rawPassword.equals(storedHash);
+        return calculatedHash.equalsIgnoreCase(storedHash);
     }
 }

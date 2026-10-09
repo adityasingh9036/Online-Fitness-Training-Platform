@@ -9,8 +9,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
+import java.util.TimeZone;
 
 /**
  * Data Access Object for User <-> Trainer communication messages.
@@ -117,17 +121,21 @@ public class MessageDAO implements GenericDAO<Message, Integer> {
 
     @Override
     public boolean save(Message m) {
-        String sql = "INSERT INTO messages (sender_id, receiver_id, message, is_read) VALUES (?, ?, ?, ?) RETURNING id, created_at";
+        String sql = "INSERT INTO messages (sender_id, receiver_id, message, is_read, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id, created_at";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, m.getSenderId());
             ps.setInt(2, m.getReceiverId());
             ps.setString(3, m.getMessage());
             ps.setBoolean(4, m.isRead());
+            
+            Timestamp ts = (m.getCreatedAt() != null) ? m.getCreatedAt() : Timestamp.from(Instant.now());
+            ps.setTimestamp(5, ts, getUtcCalendar());
+
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     m.setId(rs.getInt("id"));
-                    m.setCreatedAt(rs.getTimestamp("created_at"));
+                    m.setCreatedAt(rs.getTimestamp("created_at", getUtcCalendar()));
                     return true;
                 }
             }
@@ -190,12 +198,13 @@ public class MessageDAO implements GenericDAO<Message, Integer> {
     }
 
     private Message mapRowToMessage(ResultSet rs) throws SQLException {
+        Timestamp createdAt = rs.getTimestamp("created_at", getUtcCalendar());
         Message m = new Message(
                 rs.getInt("id"),
                 rs.getInt("sender_id"),
                 rs.getInt("receiver_id"),
                 rs.getString("message"),
-                rs.getTimestamp("created_at"),
+                createdAt,
                 rs.getBoolean("is_read")
         );
         m.setSenderName(rs.getString("sender_name"));
@@ -203,5 +212,9 @@ public class MessageDAO implements GenericDAO<Message, Integer> {
         m.setReceiverName(rs.getString("receiver_name"));
         m.setReceiverRole(rs.getString("receiver_role"));
         return m;
+    }
+
+    private static Calendar getUtcCalendar() {
+        return Calendar.getInstance(TimeZone.getTimeZone("UTC"));
     }
 }

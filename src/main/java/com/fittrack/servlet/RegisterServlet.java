@@ -5,6 +5,7 @@ import com.fittrack.exception.ValidationException;
 import com.fittrack.model.User;
 import com.fittrack.service.UserService;
 import com.fittrack.thread.NotificationThread;
+import com.fittrack.util.ValidationUtil;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -39,8 +40,12 @@ public class RegisterServlet extends HttpServlet {
         if (role == null || role.trim().isEmpty()) {
             role = "USER";
         }
+        role = role.trim().toUpperCase();
 
         try {
+            // Strictly validate role to prevent privilege escalation (e.g. creating ADMIN accounts)
+            ValidationUtil.validatePublicRegistrationRole(role);
+
             if (password == null || !password.equals(confirmPassword)) {
                 throw new ValidationException("Passwords do not match.");
             }

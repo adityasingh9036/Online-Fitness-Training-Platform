@@ -22,6 +22,7 @@
         <jakarta.jstl.version>2.0.0</jakarta.jstl.version>
         <postgresql.driver.version>42.7.3</postgresql.driver.version>
         <junit.version>5.10.2</junit.version>
+        <tomcat.embed.version>10.1.24</tomcat.embed.version>
     </properties>
 
     <dependencies>
@@ -75,6 +76,23 @@
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- Embedded Tomcat 10 for Local Development (npm run dev) -->
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-core</artifactId>
+            <version>${tomcat.embed.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-jasper</artifactId>
+            <version>${tomcat.embed.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-el</artifactId>
+            <version>${tomcat.embed.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -97,6 +115,18 @@
                 <version>3.4.0</version>
                 <configuration>
                     <failOnMissingWebXml>false</failOnMissingWebXml>
+                    <packagingExcludes>WEB-INF/lib/tomcat-embed-*.jar</packagingExcludes>
+                </configuration>
+            </plugin>
+
+            <!-- Exec Maven Plugin for running embedded dev server -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <mainClass>com.fittrack.DevServer</mainClass>
+                    <cleanupDaemonThreads>false</cleanupDaemonThreads>
                 </configuration>
             </plugin>
         </plugins>

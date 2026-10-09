@@ -109,6 +109,12 @@ public class TrainerServlet extends HttpServlet {
                 messageService.sendMessage(trainer.getId(), receiverId, content);
                 response.sendRedirect(request.getContextPath() + "/trainer/messages?userId=" + receiverId + "&success=Message+sent");
 
+            } else if ("assign_plan".equals(action)) {
+                int memberId = Integer.parseInt(request.getParameter("memberId"));
+                int planId = Integer.parseInt(request.getParameter("planId"));
+                workoutService.assignPlanToMember(trainer.getId(), memberId, planId);
+                response.sendRedirect(request.getContextPath() + "/trainer/workouts?success=Workout+plan+assigned+to+member+successfully!");
+
             } else if ("generate_report".equals(action)) {
                 // Multithreading demonstration: Triggers ProgressReportThread
                 int targetUserId = Integer.parseInt(request.getParameter("userId"));
@@ -131,10 +137,12 @@ public class TrainerServlet extends HttpServlet {
         List<WorkoutPlan> myPlans = workoutService.getPlansByTrainer(trainer.getId());
         long pendingCount = myPlans.stream().filter(WorkoutPlan::isPending).count();
         List<User> members = userDAO.findByRole("USER");
+        List<com.fittrack.model.UserWorkoutPlan> enrolledMembers = workoutService.getEnrolledMembersForTrainer(trainer.getId());
 
         request.setAttribute("myPlans", myPlans);
         request.setAttribute("pendingCount", pendingCount);
         request.setAttribute("members", members);
+        request.setAttribute("enrolledMembers", enrolledMembers);
         request.setAttribute("recentMessages", messageService.getRecentInteractions(trainer.getId()));
         request.getRequestDispatcher("/trainer/dashboard.jsp").forward(request, response);
     }
@@ -143,9 +151,13 @@ public class TrainerServlet extends HttpServlet {
             throws ServletException, IOException {
         List<WorkoutPlan> myPlans = workoutService.getPlansByTrainer(trainer.getId());
         List<Exercise> allExercises = workoutService.getAllExercises();
+        List<User> members = userDAO.findByRole("USER");
+        List<com.fittrack.model.UserWorkoutPlan> enrolledMembers = workoutService.getEnrolledMembersForTrainer(trainer.getId());
 
         request.setAttribute("myPlans", myPlans);
         request.setAttribute("exercises", allExercises);
+        request.setAttribute("members", members);
+        request.setAttribute("enrolledMembers", enrolledMembers);
         request.getRequestDispatcher("/trainer/workouts.jsp").forward(request, response);
     }
 

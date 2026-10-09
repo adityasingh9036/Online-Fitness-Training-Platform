@@ -156,4 +156,65 @@ public class WorkoutService {
         exerciseDAO.save(ex);
         return ex;
     }
+
+    public boolean markExerciseCompleted(int userId, int planId, int exerciseId) {
+        return workoutPlanDAO.markExerciseCompleted(userId, planId, exerciseId);
+    }
+
+    public boolean unmarkExerciseCompleted(int userId, int planId, int exerciseId) {
+        return workoutPlanDAO.unmarkExerciseCompleted(userId, planId, exerciseId);
+    }
+
+    public java.util.Map<String, Object> getWeeklyProgress(int userId, int planId) {
+        return workoutPlanDAO.getWeeklyProgress(userId, planId);
+    }
+
+    public WorkoutPlan getPlanWithExerciseProgress(int planId, int userId) {
+        WorkoutPlan plan = workoutPlanDAO.findById(planId);
+        if (plan != null && plan.getExercises() != null && !plan.getExercises().isEmpty()) {
+            java.util.Set<Integer> completedToday = workoutPlanDAO.getCompletedExerciseIdsToday(userId, planId);
+            for (Exercise ex : plan.getExercises()) {
+                ex.setCompletedToday(completedToday.contains(ex.getId()));
+            }
+        }
+        return plan;
+    }
+
+    public boolean assignPlanToMember(int trainerId, int memberId, int planId) throws ValidationException {
+        ValidationUtil.validatePositiveNumber(trainerId, "Trainer ID");
+        ValidationUtil.validatePositiveNumber(memberId, "Member ID");
+        ValidationUtil.validatePositiveNumber(planId, "Plan ID");
+
+        WorkoutPlan plan = workoutPlanDAO.findById(planId);
+        if (plan == null) {
+            throw new ValidationException("Workout plan not found.");
+        }
+        if (plan.getTrainerId() != trainerId && !plan.isApproved()) {
+            throw new ValidationException("You can only assign your own plans or approved system plans.");
+        }
+
+        boolean enrolled = workoutPlanDAO.enrollUserInPlan(memberId, planId);
+        if (enrolled) {
+            notificationDAO.save(new Notification(
+                    0,
+                    memberId,
+                    "Your coach has assigned you to the workout plan: " + plan.getTitle(),
+                    false,
+                    null
+            ));
+        }
+        return enrolled;
+    }
+
+    public List<UserWorkoutPlan> getEnrolledMembersForTrainer(int trainerId) {
+        List<UserWorkoutPlan> enrolled = workoutPlanDAO.getEnrolledMembersForTrainer(trainerId);
+        if (enrolled != null) {
+            for (UserWorkoutPlan uwp : enrolled) {
+                java.util.Map<String, Object> progress = workoutPlanDAO.getWeeklyProgress(uwp.getUserId(), uwp.getPlanId());
+                int pct = (progress != null && progress.containsKey("percentage")) ? (int) progress.get("percentage") : 0;
+                uwp.setCompletionPercentage(pct);
+            }
+        }
+        return enrolled;
+    }
 }

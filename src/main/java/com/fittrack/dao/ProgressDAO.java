@@ -165,6 +165,30 @@ public class ProgressDAO implements GenericDAO<Progress, Integer> {
         }
     }
 
+    /**
+     * Securely deletes a progress entry ensuring record ownership.
+     * Prevents Insecure Direct Object Reference (IDOR) by requiring matching user_id in the SQL DELETE query.
+     *
+     * @param id     Progress record ID
+     * @param userId ID of the authenticated user attempting deletion
+     * @return true if a record matching both id and user_id was deleted, false otherwise
+     */
+    public boolean deleteByIdAndUserId(int id, int userId) {
+        String sql = "DELETE FROM progress WHERE id = ? AND user_id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            ps.setInt(2, userId);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new DatabaseException("Error deleting progress entry ID: " + id + " for user ID: " + userId, e);
+        }
+    }
+
+    public boolean delete(int id, int userId) {
+        return deleteByIdAndUserId(id, userId);
+    }
+
     private Progress mapRowToProgress(ResultSet rs) throws SQLException {
         Progress p = new Progress(
                 rs.getInt("id"),

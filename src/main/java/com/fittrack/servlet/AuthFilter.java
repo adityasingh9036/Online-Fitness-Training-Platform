@@ -18,7 +18,7 @@ import java.io.IOException;
  * Role-Based Access Control (RBAC) Filter.
  * Restricts protected URLs based on user authentication and assigned role.
  */
-@WebFilter(urlPatterns = {"/admin/*", "/trainer/*", "/user/*"})
+@WebFilter(urlPatterns = {"/admin/*", "/trainer/*", "/user/*", "/notifications/*"})
 public class AuthFilter implements Filter {
 
     @Override

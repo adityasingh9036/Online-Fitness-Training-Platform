@@ -72,7 +72,7 @@
                             <div class="message-bubble <%= isMine ? "message-outgoing" : "message-incoming" %>">
                                 <div><%= m.getMessage() %></div>
                                 <div style="font-size: 0.7rem; opacity: 0.75; text-align: right; margin-top: 0.25rem;">
-                                    <%= m.getCreatedAt() != null ? m.getCreatedAt().toString().substring(11, 16) : "" %>
+                                    <%= m.getFormattedTimeIST() %>
                                 </div>
                             </div>
                         <%  }

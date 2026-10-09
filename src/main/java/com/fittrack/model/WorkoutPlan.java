@@ -154,4 +154,43 @@ public class WorkoutPlan implements Serializable {
         if ("REJECTED".equalsIgnoreCase(status)) return "badge-danger";
         return "badge-warning";
     }
+
+    /**
+     * Categorizes the workout plan into primary fitness goals.
+     * Satisfies Member Requirement: See workout plans according to fitness goals.
+     */
+    public String getGoalType() {
+        String text = ((title != null ? title : "") + " " + (description != null ? description : "")).toLowerCase();
+        if (text.contains("muscle") || text.contains("hypertrophy") || text.contains("mass") || text.contains("bulk")) {
+            return "Muscle Gain";
+        } else if (text.contains("loss") || text.contains("conditioning") || text.contains("burn") || text.contains("cut") || text.contains("fat")) {
+            return "Weight Loss & Conditioning";
+        } else if (text.contains("strength") || text.contains("power")) {
+            return "Strength & Power";
+        } else {
+            return "General Fitness";
+        }
+    }
+
+    public boolean matchesGoal(String userGoal) {
+        if (userGoal == null || userGoal.trim().isEmpty()) return true;
+        String goalLower = userGoal.trim().toLowerCase();
+        String myGoal = getGoalType().toLowerCase();
+        if (goalLower.contains("muscle") || goalLower.contains("gain") || goalLower.contains("hypertrophy")) {
+            return myGoal.contains("muscle") || myGoal.contains("strength");
+        } else if (goalLower.contains("loss") || goalLower.contains("cut") || goalLower.contains("burn")) {
+            return myGoal.contains("loss") || myGoal.contains("conditioning");
+        } else if (goalLower.contains("strength") || goalLower.contains("power")) {
+            return myGoal.contains("strength") || myGoal.contains("muscle");
+        }
+        return true;
+    }
+
+    public String getGoalBadgeClass() {
+        String g = getGoalType();
+        if ("Muscle Gain".equals(g)) return "badge-primary";
+        if ("Weight Loss & Conditioning".equals(g)) return "badge-warning";
+        if ("Strength & Power".equals(g)) return "badge-danger";
+        return "badge-secondary";
+    }
 }

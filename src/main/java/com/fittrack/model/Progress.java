@@ -109,14 +109,26 @@ public class Progress implements Serializable {
 
     /**
      * Calculates Body Mass Index (BMI).
-     * Formula: weight (kg) / (height (m) ^ 2)
+     * Formula: weight (kg) / (height (m) * height (m))
      */
     public double calculateBMI() {
         if (height <= 0 || weight <= 0) {
             return 0.0;
         }
-        double heightMeters = height / 100.0;
+        double heightMeters = (height < 3.0) ? height : (height / 100.0);
         double bmi = weight / (heightMeters * heightMeters);
+        return Math.round(bmi * 10.0) / 10.0;
+    }
+
+    /**
+     * Static utility to calculate BMI given weight (kg) and height (cm or m).
+     */
+    public static double calculateBMI(double weightKg, double heightCmOrM) {
+        if (heightCmOrM <= 0 || weightKg <= 0) {
+            return 0.0;
+        }
+        double heightMeters = (heightCmOrM < 3.0) ? heightCmOrM : (heightCmOrM / 100.0);
+        double bmi = weightKg / (heightMeters * heightMeters);
         return Math.round(bmi * 10.0) / 10.0;
     }
 

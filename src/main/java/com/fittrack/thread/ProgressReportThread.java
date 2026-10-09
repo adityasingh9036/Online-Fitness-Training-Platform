@@ -52,12 +52,42 @@ public class ProgressReportThread extends Thread {
                   .append("Current BMI: ").append(bmi).append(" (").append(latest.getBMICategory()).append(")\n")
                   .append("Active Fitness Goal: ").append(latest.getFitnessGoal()).append("\n");
 
-                if (totalWeightDiff < 0) {
-                    sb.append("Status: Positive weight loss trend observed. Keep your nutrition dialed in!");
-                } else if (totalWeightDiff > 0) {
-                    sb.append("Status: Progressive mass gain trend observed. Great for muscle building phases!");
+                String goal = latest.getFitnessGoal() != null ? latest.getFitnessGoal().toLowerCase() : "";
+                boolean isMuscleGoal = goal.contains("muscle") || goal.contains("gain") || goal.contains("hypertrophy") || goal.contains("bulk");
+                boolean isLossGoal = goal.contains("loss") || goal.contains("cut") || goal.contains("fat loss") || goal.contains("weight loss");
+
+                if (isMuscleGoal) {
+                    if (totalWeightDiff > 0) {
+                        sb.append("Status: Progressive muscle gain trend observed (+")
+                          .append(totalWeightDiff)
+                          .append(" kg). Caloric surplus and progressive overload training are on track!");
+                    } else if (totalWeightDiff < 0) {
+                        sb.append("Status: Weight decrease observed (")
+                          .append(totalWeightDiff)
+                          .append(" kg). For muscle gain goals, consider increasing caloric intake and monitoring protein consumption.");
+                    } else {
+                        sb.append("Status: Stable weight maintenance phase. Focus on progressive strength increases.");
+                    }
+                } else if (isLossGoal) {
+                    if (totalWeightDiff < 0) {
+                        sb.append("Status: Positive weight loss trend observed (")
+                          .append(totalWeightDiff)
+                          .append(" kg). Caloric deficit and workout consistency on track!");
+                    } else if (totalWeightDiff > 0) {
+                        sb.append("Status: Weight increase observed (+")
+                          .append(totalWeightDiff)
+                          .append(" kg). Review caloric deficit and training consistency.");
+                    } else {
+                        sb.append("Status: Stable weight maintenance phase.");
+                    }
                 } else {
-                    sb.append("Status: Stable weight maintenance phase.");
+                    if (totalWeightDiff > 0) {
+                        sb.append("Status: Progressive mass gain trend observed (+").append(totalWeightDiff).append(" kg).");
+                    } else if (totalWeightDiff < 0) {
+                        sb.append("Status: Weight reduction trend observed (").append(totalWeightDiff).append(" kg).");
+                    } else {
+                        sb.append("Status: Stable weight maintenance phase.");
+                    }
                 }
             }
 
@@ -75,10 +105,29 @@ public class ProgressReportThread extends Thread {
 
     /**
      * Synchronized accessor for cached report.
+     * Computes dynamically if not yet cached to guarantee fresh, consistent data.
      */
     public static synchronized String getCachedReport(int userId) {
         synchronized (REPORT_CACHE) {
-            return REPORT_CACHE.getOrDefault(userId, "Report generating... Please refresh in a moment.");
+            String cached = REPORT_CACHE.get(userId);
+            if (cached != null) {
+                return cached;
+            }
+        }
+        // Run report computation immediately if cache is cold
+        ProgressReportThread worker = new ProgressReportThread(userId);
+        worker.run();
+        synchronized (REPORT_CACHE) {
+            return REPORT_CACHE.getOrDefault(userId, "No progress report available yet.");
+        }
+    }
+
+    /**
+     * Clears cached report for a given user.
+     */
+    public static synchronized void invalidateCachedReport(int userId) {
+        synchronized (REPORT_CACHE) {
+            REPORT_CACHE.remove(userId);
         }
     }
 }

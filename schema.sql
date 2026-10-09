@@ -112,3 +112,16 @@ CREATE TABLE IF NOT EXISTS user_workout_plans (
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_plans_user ON user_workout_plans(user_id);
+
+-- 10. USER EXERCISE COMPLETIONS TABLE (Tracks daily/weekly exercise completions)
+CREATE TABLE IF NOT EXISTS user_exercise_completions (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    plan_id INT NOT NULL REFERENCES workout_plans(id) ON DELETE CASCADE,
+    exercise_id INT NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
+    completed_date DATE DEFAULT CURRENT_DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_user_plan_ex_date UNIQUE (user_id, plan_id, exercise_id, completed_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_ex_comp_date ON user_exercise_completions(user_id, completed_date);

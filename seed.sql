@@ -4,10 +4,8 @@
 -- ==========================================================
 
 -- 1. Insert Default Users
--- Passwords:
--- admin@fittrack.com   -> admin123   (SHA-256: 240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9)
--- trainer@fittrack.com -> trainer123 (SHA-256: 5b3d264e4cdc2c39ca6708b3e1e21f082722be12e63ee21484bdbe15735ab066)
--- user@fittrack.com    -> user123    (SHA-256: e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446)
+-- Pre-hashed SHA-256 passwords for default demo accounts.
+-- In production environments, replace with strong unique user credentials.
 INSERT INTO users (id, name, email, password, role) VALUES
 (1, 'System Administrator', 'admin@fittrack.com', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'ADMIN'),
 (2, 'Coach Marcus Vance', 'trainer@fittrack.com', '5b3d264e4cdc2c39ca6708b3e1e21f082722be12e63ee21484bdbe15735ab066', 'TRAINER'),
@@ -59,11 +57,11 @@ INSERT INTO plan_exercises (plan_id, exercise_id) VALUES
 (3, 7)  -- Elite -> Shoulder Press
 ON CONFLICT DO NOTHING;
 
--- 5. Insert Sample Progress for Alex Johnson (User ID: 3)
+-- 5. Insert Sample Progress for Alex Johnson (User ID: 3) - Muscle Gain Journey
 INSERT INTO progress (user_id, weight, height, body_measurement, fitness_goal, record_date) VALUES
-(3, 76.5, 175.0, 'Chest: 38in, Waist: 34in', 'Weight Loss and Lean Muscle', CURRENT_DATE - INTERVAL '14 days'),
-(3, 75.2, 175.0, 'Chest: 38.5in, Waist: 33.5in', 'Weight Loss and Lean Muscle', CURRENT_DATE - INTERVAL '7 days'),
-(3, 74.0, 175.0, 'Chest: 39in, Waist: 32.8in', 'Weight Loss and Lean Muscle', CURRENT_DATE)
+(3, 68.0, 170.0, 'Chest: 37in, Waist: 31in, Arms: 13.5in', 'Muscle Gain', CURRENT_DATE - INTERVAL '14 days'),
+(3, 69.0, 170.0, 'Chest: 37.5in, Waist: 31in, Arms: 13.8in', 'Muscle Gain', CURRENT_DATE - INTERVAL '7 days'),
+(3, 70.0, 170.0, 'Chest: 38in, Waist: 31.2in, Arms: 14.0in', 'Muscle Gain', CURRENT_DATE)
 ON CONFLICT DO NOTHING;
 
 -- 6. Insert User Workout Enrollment

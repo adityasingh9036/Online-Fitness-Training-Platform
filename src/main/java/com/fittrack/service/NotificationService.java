@@ -35,6 +35,10 @@ public class NotificationService {
         return notificationDAO.findUnreadByUserId(userId);
     }
 
+    public boolean markAsRead(int notificationId, int userId) {
+        return notificationDAO.markAsRead(notificationId, userId);
+    }
+
     public boolean markAsRead(int notificationId) {
         return notificationDAO.markAsRead(notificationId);
     }

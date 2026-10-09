@@ -1,0 +1,22 @@
+{
+  "name": "fittrack-platform",
+  "version": "1.0.0",
+  "description": "FitTrack - Online Fitness Training Platform (Java EE / Jakarta Servlets, JSP, JDBC, Supabase)",
+  "scripts": {
+    "dev": "mvnw.cmd compile exec:java",
+    "start": "mvnw.cmd compile exec:java",
+    "build": "mvnw.cmd clean package",
+    "test": "mvnw.cmd test"
+  },
+  "keywords": [
+    "fittrack",
+    "fitness",
+    "servlets",
+    "jsp",
+    "jdbc",
+    "supabase",
+    "tomcat"
+  ],
+  "author": "FitTrack Team",
+  "license": "ISC"
+}

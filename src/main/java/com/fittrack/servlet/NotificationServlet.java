@@ -28,8 +28,19 @@ public class NotificationServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
-        HttpSession session = request.getSession();
-        User currentUser = (User) session.getAttribute("currentUser");
+        HttpSession session = request.getSession(false);
+        User currentUser = (session != null) ? (User) session.getAttribute("currentUser") : null;
+
+        if (currentUser == null) {
+            response.sendRedirect(request.getContextPath() + "/login?error=Please+login+to+access+this+page");
+            return;
+        }
+
+        String path = request.getServletPath();
+        if ("/notifications/read".equals(path) || "/notifications/read-all".equals(path)) {
+            response.sendRedirect(request.getContextPath() + "/user/notifications");
+            return;
+        }
 
         List<Notification> list = notificationService.getUserNotifications(currentUser.getId());
         request.setAttribute("notifications", list);
@@ -39,14 +50,24 @@ public class NotificationServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
-        HttpSession session = request.getSession();
-        User currentUser = (User) session.getAttribute("currentUser");
+        HttpSession session = request.getSession(false);
+        User currentUser = (session != null) ? (User) session.getAttribute("currentUser") : null;
+
+        if (currentUser == null) {
+            response.sendRedirect(request.getContextPath() + "/login?error=Please+login+to+access+this+page");
+            return;
+        }
+
         String path = request.getServletPath();
 
         try {
             if ("/notifications/read".equals(path)) {
-                int id = Integer.parseInt(request.getParameter("id"));
-                notificationService.markAsRead(id);
+                String idParam = request.getParameter("id");
+                if (idParam != null && !idParam.trim().isEmpty()) {
+                    int id = Integer.parseInt(idParam.trim());
+                    // Enforce notification ownership at database level
+                    notificationService.markAsRead(id, currentUser.getId());
+                }
             } else if ("/notifications/read-all".equals(path)) {
                 notificationService.markAllAsRead(currentUser.getId());
             }

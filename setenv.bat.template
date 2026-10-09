@@ -1,0 +1,17 @@
+@echo off
+REM =========================================================================
+REM FitTrack - Apache Tomcat Environment Configuration (setenv.bat)
+REM 
+REM How to use:
+REM 1. Copy this file into your Apache Tomcat bin directory:
+REM    copy setenv.bat.template "C:\path\to\apache-tomcat-10.1.x\bin\setenv.bat"
+REM 2. Replace YOUR_SUPABASE_PASSWORD below with your actual database password.
+REM 3. Tomcat automatically executes setenv.bat on every startup (startup.bat).
+REM =========================================================================
+
+set "DB_URL=jdbc:postgresql://<YOUR_SUPABASE_HOST>:5432/postgres?sslmode=require"
+set "DB_USER=postgres.<YOUR_PROJECT_REF>"
+set "DB_PASSWORD=YOUR_SUPABASE_PASSWORD"
+
+REM Optional JVM memory tuning:
+REM set "CATALINA_OPTS=%CATALINA_OPTS% -Xms256m -Xmx512m"

@@ -116,22 +116,22 @@
                 <form action="<%= request.getContextPath() %>/user/progress/log" method="POST">
                     <div class="form-group">
                         <label class="form-label" for="weight">Weight (kg)</label>
-                        <input type="number" step="0.1" id="weight" name="weight" class="form-control" required placeholder="e.g. 74.5">
+                        <input type="number" step="0.1" id="weight" name="weight" class="form-control" required placeholder="e.g. 70.0">
                     </div>
 
                     <div class="form-group">
                         <label class="form-label" for="height">Height (cm)</label>
-                        <input type="number" step="0.5" id="height" name="height" class="form-control" required placeholder="e.g. 175.0">
+                        <input type="number" step="0.5" id="height" name="height" class="form-control" required placeholder="e.g. 170.0">
                     </div>
 
                     <div class="form-group">
                         <label class="form-label" for="fitnessGoal">Primary Fitness Goal</label>
-                        <input type="text" id="fitnessGoal" name="fitnessGoal" class="form-control" required placeholder="e.g. Fat Loss & Hypertrophy">
+                        <input type="text" id="fitnessGoal" name="fitnessGoal" class="form-control" required placeholder="e.g. Muscle Gain">
                     </div>
 
                     <div class="form-group">
                         <label class="form-label" for="bodyMeasurement">Measurements (Tape / Notes)</label>
-                        <input type="text" id="bodyMeasurement" name="bodyMeasurement" class="form-control" placeholder="e.g. Waist: 33in, Arms: 15in">
+                        <input type="text" id="bodyMeasurement" name="bodyMeasurement" class="form-control" placeholder="e.g. Chest: 38in, Waist: 31in">
                     </div>
 
                     <div class="form-group">
@@ -170,8 +170,14 @@
                                         <td><%= p.getRecordDate() %></td>
                                         <td><strong><%= p.getWeight() %> kg</strong></td>
                                         <td>
-                                            <% if (p.getWeightChange() != 0.0) { %>
-                                                <span class="badge <%= p.getWeightChange() < 0 ? "badge-success" : "badge-warning" %>">
+                                            <% if (p.getWeightChange() != 0.0) { 
+                                                boolean isMuscleGoal = p.getFitnessGoal() != null && 
+                                                    (p.getFitnessGoal().toLowerCase().contains("gain") || p.getFitnessGoal().toLowerCase().contains("muscle") || p.getFitnessGoal().toLowerCase().contains("bulk"));
+                                                String badgeClass = (p.getWeightChange() > 0)
+                                                    ? (isMuscleGoal ? "badge-success" : "badge-warning")
+                                                    : (isMuscleGoal ? "badge-warning" : "badge-success");
+                                            %>
+                                                <span class="badge <%= badgeClass %>">
                                                     <%= (p.getWeightChange() > 0 ? "+" : "") + p.getWeightChange() %> kg
                                                 </span>
                                             <% } else { %>

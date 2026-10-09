@@ -47,4 +47,22 @@ public class ValidationUtil {
             throw new ValidationException("Invalid role: " + role + ". Must be ADMIN, TRAINER, or USER.");
         }
     }
+
+    /**
+     * Validates that the role requested during public registration is strictly allowed.
+     * Prevents privilege escalation by explicitly rejecting ADMIN or any non-supported roles.
+     *
+     * @param role Requested role string
+     * @throws ValidationException if the role is null, empty, ADMIN, or not USER/TRAINER
+     */
+    public static void validatePublicRegistrationRole(String role) throws ValidationException {
+        validateNotEmpty(role, "Role");
+        String upper = role.trim().toUpperCase();
+        if (upper.equals("ADMIN")) {
+            throw new ValidationException("Registration with role ADMIN is not permitted.");
+        }
+        if (!upper.equals("TRAINER") && !upper.equals("USER")) {
+            throw new ValidationException("Invalid role for registration: " + role + ". Public registration allows only USER or TRAINER accounts.");
+        }
+    }
 }

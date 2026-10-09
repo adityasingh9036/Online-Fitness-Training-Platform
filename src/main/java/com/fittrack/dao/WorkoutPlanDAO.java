@@ -12,7 +12,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Data Access Object for Workout Plans, Plan-Exercise associations, and User enrollments.
@@ -326,6 +330,126 @@ public class WorkoutPlanDAO implements GenericDAO<WorkoutPlan, Integer> {
         } catch (SQLException e) {
             throw new DatabaseException("Error completing plan for user: " + userId, e);
         }
+    }
+
+    // --- Member Exercise Tracking & Weekly Progress ---
+
+    public boolean markExerciseCompleted(int userId, int planId, int exerciseId) {
+        String sql = "INSERT INTO user_exercise_completions (user_id, plan_id, exercise_id, completed_date) " +
+                     "VALUES (?, ?, ?, CURRENT_DATE) " +
+                     "ON CONFLICT (user_id, plan_id, exercise_id, completed_date) DO NOTHING";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setInt(2, planId);
+            ps.setInt(3, exerciseId);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new DatabaseException("Error recording exercise completion for user " + userId, e);
+        }
+    }
+
+    public boolean unmarkExerciseCompleted(int userId, int planId, int exerciseId) {
+        String sql = "DELETE FROM user_exercise_completions " +
+                     "WHERE user_id = ? AND plan_id = ? AND exercise_id = ? AND completed_date = CURRENT_DATE";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setInt(2, planId);
+            ps.setInt(3, exerciseId);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new DatabaseException("Error removing exercise completion for user " + userId, e);
+        }
+    }
+
+    public Set<Integer> getCompletedExerciseIdsToday(int userId, int planId) {
+        Set<Integer> completed = new HashSet<>();
+        String sql = "SELECT exercise_id FROM user_exercise_completions " +
+                     "WHERE user_id = ? AND plan_id = ? AND completed_date = CURRENT_DATE";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setInt(2, planId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    completed.add(rs.getInt("exercise_id"));
+                }
+            }
+        } catch (SQLException e) {
+            throw new DatabaseException("Error fetching today's completed exercises", e);
+        }
+        return completed;
+    }
+
+    public int getWeeklyCompletedCount(int userId, int planId) {
+        String sql = "SELECT COUNT(DISTINCT exercise_id) FROM user_exercise_completions " +
+                     "WHERE user_id = ? AND plan_id = ? AND completed_date >= CURRENT_DATE - INTERVAL '7 days'";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setInt(2, planId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            throw new DatabaseException("Error counting weekly completed exercises", e);
+        }
+        return 0;
+    }
+
+    public Map<String, Object> getWeeklyProgress(int userId, int planId) {
+        Map<String, Object> progress = new HashMap<>();
+        List<Exercise> exercises = exerciseDAO.findByPlanId(planId);
+        int totalExercises = exercises != null ? exercises.size() : 0;
+        int completedWeekly = getWeeklyCompletedCount(userId, planId);
+        int percentage = totalExercises > 0 ? Math.min(100, (int) Math.round(((double) completedWeekly / totalExercises) * 100)) : 0;
+        Set<Integer> completedToday = getCompletedExerciseIdsToday(userId, planId);
+
+        progress.put("totalExercises", totalExercises);
+        progress.put("completedWeekly", completedWeekly);
+        progress.put("percentage", percentage);
+        progress.put("completedTodaySet", completedToday);
+        progress.put("completedTodayCount", completedToday.size());
+        return progress;
+    }
+
+    // --- Trainer Member Assignments ---
+
+    public List<UserWorkoutPlan> getEnrolledMembersForTrainer(int trainerId) {
+        List<UserWorkoutPlan> list = new ArrayList<>();
+        String sql = "SELECT uwp.id, uwp.user_id, u.name AS user_name, u.email AS user_email, " +
+                     "uwp.plan_id, wp.title, wp.difficulty, wp.duration, uwp.status, uwp.enrolled_at " +
+                     "FROM user_workout_plans uwp " +
+                     "JOIN workout_plans wp ON uwp.plan_id = wp.id " +
+                     "JOIN users u ON uwp.user_id = u.id " +
+                     "WHERE wp.trainer_id = ? " +
+                     "ORDER BY uwp.enrolled_at DESC";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, trainerId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    UserWorkoutPlan uwp = new UserWorkoutPlan(
+                            rs.getInt("id"),
+                            rs.getInt("user_id"),
+                            rs.getInt("plan_id"),
+                            rs.getString("title"),
+                            rs.getString("difficulty"),
+                            rs.getInt("duration"),
+                            "",
+                            rs.getString("status"),
+                            rs.getTimestamp("enrolled_at")
+                    );
+                    uwp.setUserName(rs.getString("user_name"));
+                    uwp.setUserEmail(rs.getString("user_email"));
+                    list.add(uwp);
+                }
+            }
+        } catch (SQLException e) {
+            throw new DatabaseException("Error fetching enrolled members for trainer ID: " + trainerId, e);
+        }
+        return list;
     }
 
     private WorkoutPlan mapRowToPlan(ResultSet rs) throws SQLException {

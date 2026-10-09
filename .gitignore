@@ -30,6 +30,15 @@ out/
 .vscode/
 
 ### Secrets & Local config ###
+db.properties
+src/main/resources/db.properties
+!db.properties.example
+!**/db.properties.example
+*.properties.local
 db_credentials_secret.properties
 *.log
 .env
+setenv.bat
+setenv.sh
+*.local.ps1
+run-tomcat.ps1

@@ -108,4 +108,32 @@ public class UserWorkoutPlan implements Serializable {
     public void setEnrolledAt(Timestamp enrolledAt) {
         this.enrolledAt = enrolledAt;
     }
+
+    private String userName;
+    private String userEmail;
+    private int completionPercentage = 0;
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
+    public String getUserEmail() {
+        return userEmail;
+    }
+
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
+    }
+
+    public int getCompletionPercentage() {
+        return completionPercentage;
+    }
+
+    public void setCompletionPercentage(int completionPercentage) {
+        this.completionPercentage = completionPercentage;
+    }
 }

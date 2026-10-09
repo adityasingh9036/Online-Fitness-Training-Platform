@@ -119,6 +119,26 @@ public class NotificationDAO implements GenericDAO<Notification, Integer> {
         }
     }
 
+    /**
+     * Marks a notification as read only if it belongs to the authenticated user.
+     * Enforces ownership directly at the database query level to prevent IDOR vulnerabilities.
+     *
+     * @param notificationId Notification record ID
+     * @param userId         Authenticated user ID owning the notification
+     * @return true if updated, false if not found or unauthorized
+     */
+    public boolean markAsRead(int notificationId, int userId) {
+        String sql = "UPDATE notifications SET is_read = TRUE WHERE id = ? AND user_id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, notificationId);
+            ps.setInt(2, userId);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new DatabaseException("Error marking notification ID " + notificationId + " as read for user ID: " + userId, e);
+        }
+    }
+
     public boolean markAsRead(int notificationId) {
         String sql = "UPDATE notifications SET is_read = TRUE WHERE id = ?";
         try (Connection conn = DBConnection.getConnection();

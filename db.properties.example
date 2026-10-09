@@ -1,0 +1,23 @@
+# ==========================================================
+# FitTrack - Database Configuration Template
+# ==========================================================
+# Copy this file to src/main/resources/db.properties or configure
+# via environment variables (DB_URL, DB_USER, DB_PASSWORD) or local .env file.
+#
+# JDBC Driver:
+db.driver=org.postgresql.Driver
+
+# Database Connection URL:
+# For Supabase PostgreSQL (IPv4 Session Pooler recommended):
+db.url=jdbc:postgresql://<YOUR_SUPABASE_HOST>:5432/postgres?sslmode=require
+
+# Database Username:
+# For Supabase PostgreSQL:
+db.username=postgres.<YOUR_PROJECT_REF>
+
+# Database Password:
+db.password=your_database_password_here
+
+# Pure JDBC Connection Pool Settings:
+db.pool.maxActive=10
+db.pool.timeoutMs=5000

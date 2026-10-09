@@ -50,8 +50,12 @@ public class ProgressServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
-        HttpSession session = request.getSession();
-        User user = (User) session.getAttribute("currentUser");
+        HttpSession session = request.getSession(false);
+        User user = (session != null) ? (User) session.getAttribute("currentUser") : null;
+        if (user == null) {
+            response.sendRedirect(request.getContextPath() + "/login");
+            return;
+        }
         String path = request.getServletPath();
 
         try {
@@ -76,8 +80,14 @@ public class ProgressServlet extends HttpServlet {
 
             } else if ("/user/progress/delete".equals(path)) {
                 int progressId = Integer.parseInt(request.getParameter("id"));
-                progressService.deleteProgress(progressId);
-                response.sendRedirect(request.getContextPath() + "/user/progress?success=Log+deleted+successfully");
+                // Enforce record ownership in database query to prevent IDOR
+                boolean deleted = progressService.deleteProgress(progressId, user.getId());
+                if (deleted) {
+                    ProgressReportThread.invalidateCachedReport(user.getId());
+                    response.sendRedirect(request.getContextPath() + "/user/progress?success=Log+deleted+successfully");
+                } else {
+                    response.sendRedirect(request.getContextPath() + "/user/progress?error=Unauthorized+or+record+not+found");
+                }
 
             } else if ("/user/progress/generate-report".equals(path)) {
                 // Explicitly spawn background thread to recalculate report

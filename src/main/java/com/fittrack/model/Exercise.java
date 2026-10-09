@@ -86,7 +86,25 @@ public class Exercise implements Serializable {
         this.duration = duration;
     }
 
+    private boolean completedToday = false;
+
+    public boolean isCompletedToday() {
+        return completedToday;
+    }
+
+    public void setCompletedToday(boolean completedToday) {
+        this.completedToday = completedToday;
+    }
+
+    public String getRestTimeFormatted() {
+        if (duration <= 0) return "No Rest / Continuous";
+        if (duration < 60) return duration + "s rest";
+        int mins = duration / 60;
+        int secs = duration % 60;
+        return mins + "m" + (secs > 0 ? " " + secs + "s" : "") + " rest";
+    }
+
     public String getSummary() {
-        return sets + " sets × " + reps + " reps" + (duration > 0 ? " (" + duration + "s rest/duration)" : "");
+        return sets + " sets × " + reps + " reps" + (duration > 0 ? " (" + getRestTimeFormatted() + ")" : "");
     }
 }
