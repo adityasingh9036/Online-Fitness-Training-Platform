@@ -12,13 +12,11 @@ FROM maven:3.9.6-eclipse-temurin-17 AS builder
 
 WORKDIR /app
 
-# Copy Maven descriptor and wrapper for layer caching
+# Copy Maven descriptor for dependency resolution
 COPY pom.xml .
-COPY .mvn .mvn
-COPY mvnw* ./
 
 # Resolve dependencies in a cacheable layer
-RUN mvn dependency:go-offline -B || ./mvnw dependency:go-offline -B || true
+RUN mvn dependency:go-offline -B || true
 
 # Copy application source code
 COPY src ./src
@@ -33,8 +31,10 @@ FROM eclipse-temurin:17-jre-jammy
 
 WORKDIR /app
 
-# Create a dedicated non-root application user for container security
-RUN groupadd -r fittrack && useradd -r -g fittrack -d /app -s /bin/bash fittrack
+# Install curl for container healthcheck and create dedicated non-root application user
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r fittrack && useradd -r -g fittrack -d /app -s /bin/bash fittrack
 
 # Copy compiled classes, runtime dependencies, web assets, and resource templates
 COPY --from=builder /app/target/classes ./target/classes
